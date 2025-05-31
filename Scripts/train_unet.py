@@ -159,7 +159,7 @@ def train_validate_test(model, train_loader, val_loader, test_loader):
             if col == 0:
                 axes[row, col].set_ylabel(title, fontsize=12)
 
-    fig.suptitle("Sample Results: Noisy | Denoised | Clean", fontsize=16)
+    fig.suptitle("First row: Noisy | Second row: Denoised | Third row: Clean", fontsize=16)
     plt.tight_layout()
     plt.savefig(OUTPUT_DIR / "sample_results.png")
     plt.close()
