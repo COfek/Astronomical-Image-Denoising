@@ -41,6 +41,7 @@ def gaussian_kernel(size: int = 11, sigma: float = 2) -> np.ndarray:
     return kernel / np.sum(kernel)
 
 psf: np.ndarray = gaussian_kernel(PSF_SIZE, PSF_SIGMA)
+np.save(Path(OUTPUT_DIR) / "psf.npy", psf)
 
 def simulate_blurred_noisy(clean_img: np.ndarray, psf: np.ndarray, sigma: float) -> np.ndarray:
     """
@@ -148,5 +149,4 @@ def download_and_process_sdss() -> None:
     if VERBOSE:
         print(f"\n🎉 Done! {len(futures)} images saved to `{OUTPUT_DIR}`")
 
-if __name__ == "__main__":
-    download_and_process_sdss()
+
