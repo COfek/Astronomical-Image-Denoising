@@ -12,7 +12,8 @@ build/
 develop-eggs/
 dist/
 downloads/
-Data/
+Data/noisy
+Data/clean
 eggs/
 .eggs/
 lib/
