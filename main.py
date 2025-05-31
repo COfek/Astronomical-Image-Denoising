@@ -7,8 +7,12 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from Data.dataloader import AstroDenoisingDataset
 from Models.unet import UNet
-from Scripts import train_validate_test, red_restore, tikhonov_restore, tv_restore, plot_unet_denoising, plot_classic_denoising
-from Data.simulate_astronomy_dataset import gaussian_kernel, download_and_process_sdss  
+from Scripts.train_unet import train_validate_test
+from Scripts.red_inference import red_restore
+from Scripts.tikhonov_restore import tikhonov_restore
+from Scripts.TV_restore import tv_restore
+from Scripts.plots import plot_classic_denoising, plot_unet_denoising
+from Data.simulate_astronomy_dataset import download_and_process_sdss  
 
 # === CONFIGURATION ===
 VERBOSE: bool = True # Set to False to suppress print statements
@@ -44,10 +48,14 @@ if __name__ == "__main__":
         if VERBOSE:
             print(f"✅ Loaded pre-trained UNet from {MODEL_PATH}")
 
-    # === RED Inference on One Test Image ===
+    # === Prepare Test Data ===
     noisy_img, clean_img = next(iter(test_loader))
     psf_np = np.load("Data/psf.npy")  # Load the exact kernel used
     psf_tensor = torch.tensor(psf_np, dtype=torch.float32).unsqueeze(0).unsqueeze(0)  # Shape: [1, 1, H, W]
+
+    # === RED Inference on One Test Image ===
+    if VERBOSE:
+        print("Performing RED inference on one test image...")
     restored_image = red_restore(
         y=noisy_img.to(DEVICE),
         denoiser=model,
