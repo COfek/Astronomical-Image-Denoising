@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from Scripts.utils import compute_psnr, compute_ssim_batch
 
 def tikhonov_restore(y: torch.Tensor, kernel: torch.Tensor, lambda_: float = 0.01,

@@ -1,5 +1,6 @@
 import torch
 from Scripts.utils import compute_psnr, compute_ssim_batch
+import torch.nn.functional as F
 
 def tv_restore(y: torch.Tensor, kernel: torch.Tensor, lambda_: float = 0.01,
                 alpha: float = 0.1, max_iter: int = 50, device: str = "cuda" if torch.cuda.is_available() else "cpu",
