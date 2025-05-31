@@ -29,7 +29,20 @@ torch.manual_seed(SEED)
 np.random.seed(SEED)
 random.seed(SEED)
 
-def train_validate_test(model, train_loader, val_loader, test_loader):
+def train_validate_test(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, test_loader: DataLoader) -> None:
+    """
+    Trains a denoising model (e.g., UNet) using provided training, validation, and test data loaders.
+
+    Args:
+        model (Module): The PyTorch model to train and evaluate.
+        train_loader (DataLoader): DataLoader for the training dataset.
+        val_loader (DataLoader): DataLoader for the validation dataset.
+        test_loader (DataLoader): DataLoader for the test dataset.
+
+    Returns:
+        NoReturn: This function does not return anything. It saves training logs, model weights,
+        evaluation metrics, and sample output images to the 'output/<model_name>' directory.
+    """   
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if VERBOSE:
         print(f"Using device: {device}")

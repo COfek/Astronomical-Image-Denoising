@@ -3,6 +3,11 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from Models.unet import UNet
 from Scripts.train_unet import train_validate_test
+from Scripts.red_inference import red_restore
+
+# CONFIG
+VERBOSE = True
+train = False
 
 if __name__ == "__main__":
     # Set up shared dataset and loaders
@@ -18,4 +23,13 @@ if __name__ == "__main__":
 
     # Train UNet
     model = UNet()
-    train_validate_test(model, train_loader, val_loader, test_loader)
+    if train:
+        train_validate_test(model, train_loader, val_loader, test_loader)
+    else:
+        model.load_state_dict(torch.load("output/unet/best_model.pth"))
+        if VERBOSE:
+            print("Loaded pre-trained UNet model.")
+
+    # RED inference (on the first test image)
+    noisy_img, _ = next(iter(test_loader))
+    red_restore(model, noisy_img.squeeze(0))
