@@ -14,7 +14,7 @@ import numpy as np
 from tqdm import tqdm
 from Data.dataloader import AstroDenoisingDataset
 from Models.unet import UNet
-from Scripts.utils import compute_psnr
+from Scripts.utils import compute_psnr, compute_ssim_batch
 
 # === Config ===
 VERBOSE = True
@@ -33,6 +33,7 @@ def train_validate_test(model, train_loader, val_loader, test_loader):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if VERBOSE:
         print(f"Using device: {device}")
+    model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
@@ -59,7 +60,7 @@ def train_validate_test(model, train_loader, val_loader, test_loader):
 
             train_loss += loss.item()
             train_psnr += compute_psnr(output, clean)
-            train_ssim += compute_ssim_batch(output, clean)
+            train_ssim += compute_ssim_batch(output.detach(), clean.detach())
             loop.set_postfix(loss=loss.item())
 
         avg_train_loss = train_loss / len(train_loader)
@@ -79,7 +80,7 @@ def train_validate_test(model, train_loader, val_loader, test_loader):
                 output = model(noisy)
                 val_loss += loss_fn(output, clean).item()
                 val_psnr += compute_psnr(output, clean)
-                val_ssim += compute_ssim_batch(output, clean)
+                val_ssim += compute_ssim_batch(output.detach(), clean.detach())
 
         avg_val_loss = val_loss / len(val_loader)
         avg_val_psnr = val_psnr / len(val_loader)
@@ -137,7 +138,7 @@ def train_validate_test(model, train_loader, val_loader, test_loader):
             output = model(noisy)
             test_loss += loss_fn(output, clean).item()
             test_psnr += compute_psnr(output, clean)
-            test_ssim += compute_ssim_batch(output, clean)
+            test_ssim += compute_ssim_batch(output.detach(), clean.detach())
 
     print(f"Test Loss: {test_loss / len(test_loader):.6f}, PSNR: {test_psnr / len(test_loader):.2f} dB, SSIM: {test_ssim / len(test_loader):.4f}")
 
@@ -148,22 +149,17 @@ def train_validate_test(model, train_loader, val_loader, test_loader):
         output = model(noisy.to(device)).cpu()
 
     fig, axes = plt.subplots(3, BATCH_SIZE, figsize=(BATCH_SIZE * 2, 6))
-    for i in range(BATCH_SIZE):
-        axes[0, i].imshow(noisy[i][0], cmap='gray')
-        axes[0, i].axis('off')
-        if i == 0:
-            axes[0, i].set_ylabel("Noisy", fontsize=12)
+    row_titles = ["Noisy", "Denoised", "Clean"]
+    for row, title in enumerate(row_titles):
+        for col in range(BATCH_SIZE):
+            axes[row, col].imshow([
+                noisy, output, clean
+            ][row][col][0], cmap='gray')
+            axes[row, col].axis('off')
+            if col == 0:
+                axes[row, col].set_ylabel(title, fontsize=12)
 
-        axes[1, i].imshow(output[i][0], cmap='gray')
-        axes[1, i].axis('off')
-        if i == 0:
-            axes[1, i].set_ylabel("Denoised", fontsize=12)
-
-        axes[2, i].imshow(clean[i][0], cmap='gray')
-        axes[2, i].axis('off')
-        if i == 0:
-            axes[2, i].set_ylabel("Clean", fontsize=12)
-
+    fig.suptitle("Sample Results: Noisy | Denoised | Clean", fontsize=16)
     plt.tight_layout()
     plt.savefig(OUTPUT_DIR / "sample_results.png")
     plt.close()
