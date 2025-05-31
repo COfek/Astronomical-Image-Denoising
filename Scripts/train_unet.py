@@ -6,36 +6,42 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
+import torchvision.utils as vutils
 import matplotlib.pyplot as plt
+import random
+import numpy as np
 from tqdm import tqdm
 from Data.dataloader import AstroDenoisingDataset
 from Models.unet import UNet
+from Scripts.utils import compute_psnr
 
-VERBOSE = False  # Toggle print statements
+# === Config ===
+VERBOSE = True
+EPOCHS = 10
+BATCH_SIZE = 8
+SEED = 42
 
+# === Reproducibility ===
+torch.manual_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
 
-def train_validate_test():
+def train_validate_test(model, train_loader, val_loader, test_loader):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if VERBOSE:
         print(f"Using device: {device}")
-        
-    dataset = AstroDenoisingDataset("Data/clean", "Data/noisy", transform=transforms.ToTensor())
-    train_size = int(0.8 * len(dataset))
-    val_size = int(0.1 * len(dataset))
-    test_size = len(dataset) - train_size - val_size
-    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
-
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
-
-    model = UNet().to(device)
+    # === Dataset Preparation ===
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
 
-    for epoch in range(10):
+    best_val_loss = float('inf')
+    train_losses, val_losses = [], []
+    train_psnrs, val_psnrs = [], []
+
+    for epoch in range(EPOCHS):
         model.train()
         train_loss = 0.0
+        train_psnr = 0.0
         loop = tqdm(train_loader, desc=f"Epoch {epoch+1} [Train]", leave=False)
         for noisy, clean in loop:
             noisy, clean = noisy.to(device), clean.to(device)
@@ -47,27 +53,93 @@ def train_validate_test():
             optimizer.step()
 
             train_loss += loss.item()
+            train_psnr += compute_psnr(output, clean)
             loop.set_postfix(loss=loss.item())
+
+        avg_train_loss = train_loss / len(train_loader)
+        avg_train_psnr = train_psnr / len(train_loader)
+        train_losses.append(avg_train_loss)
+        train_psnrs.append(avg_train_psnr)
 
         model.eval()
         val_loss = 0.0
+        val_psnr = 0.0
         with torch.no_grad():
             for noisy, clean in tqdm(val_loader, desc=f"Epoch {epoch+1} [Val]", leave=False):
                 noisy, clean = noisy.to(device), clean.to(device)
                 output = model(noisy)
                 val_loss += loss_fn(output, clean).item()
+                val_psnr += compute_psnr(output, clean)
 
-        print(f"Epoch {epoch+1}: Train Loss = {train_loss / len(train_loader):.6f}, Val Loss = {val_loss / len(val_loader):.6f}")
+        avg_val_loss = val_loss / len(val_loader)
+        avg_val_psnr = val_psnr / len(val_loader)
+        val_losses.append(avg_val_loss)
+        val_psnrs.append(avg_val_psnr)
 
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            torch.save(model.state_dict(), "best_unet.pth")
+            if VERBOSE:
+                print(f"✅ Saved better model at epoch {epoch+1}")
+
+        print(f"Epoch {epoch+1}: Train Loss = {avg_train_loss:.6f}, PSNR = {avg_train_psnr:.2f} | Val Loss = {avg_val_loss:.6f}, PSNR = {avg_val_psnr:.2f}")
+
+    # Plot loss curves
+    plt.figure()
+    plt.plot(train_losses, label="Train Loss")
+    plt.plot(val_losses, label="Val Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training vs Validation Loss")
+    plt.legend()
+    plt.savefig("loss_plot.png")
+
+    # Plot PSNR curves
+    plt.figure()
+    plt.plot(train_psnrs, label="Train PSNR")
+    plt.plot(val_psnrs, label="Val PSNR")
+    plt.xlabel("Epoch")
+    plt.ylabel("PSNR (dB)")
+    plt.title("Training vs Validation PSNR")
+    plt.legend()
+    plt.savefig("psnr_plot.png")
+
+    # Test Phase
     model.eval()
     test_loss = 0.0
+    test_psnr = 0.0
     with torch.no_grad():
         for noisy, clean in tqdm(test_loader, desc="Testing", leave=False):
             noisy, clean = noisy.to(device), clean.to(device)
             output = model(noisy)
             test_loss += loss_fn(output, clean).item()
+            test_psnr += compute_psnr(output, clean)
 
-    print(f"Test Loss: {test_loss / len(test_loader):.6f}")
+    print(f"Test Loss: {test_loss / len(test_loader):.6f}, Test PSNR: {test_psnr / len(test_loader):.2f} dB")
 
-if __name__ == '__main__':
-    train_validate_test()
+    # Save example output triplet (noisy, output, clean) with labels
+    noisy, clean = next(iter(test_loader))
+    model.eval()
+    with torch.no_grad():
+        output = model(noisy.to(device)).cpu()
+
+    fig, axes = plt.subplots(3, BATCH_SIZE, figsize=(BATCH_SIZE * 2, 6))
+    for i in range(BATCH_SIZE):
+        axes[0, i].imshow(noisy[i][0], cmap='gray')
+        axes[0, i].axis('off')
+        if i == 0:
+            axes[0, i].set_ylabel("Noisy", fontsize=12)
+
+        axes[1, i].imshow(output[i][0], cmap='gray')
+        axes[1, i].axis('off')
+        if i == 0:
+            axes[1, i].set_ylabel("Denoised", fontsize=12)
+
+        axes[2, i].imshow(clean[i][0], cmap='gray')
+        axes[2, i].axis('off')
+        if i == 0:
+            axes[2, i].set_ylabel("Clean", fontsize=12)
+
+    plt.tight_layout()
+    plt.savefig("sample_results.png")
+    plt.close()
