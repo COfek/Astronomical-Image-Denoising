@@ -7,8 +7,7 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from Data.dataloader import AstroDenoisingDataset
 from Models.unet import UNet
-from Scripts.train_unet import train_validate_test
-from Scripts.red_inference import red_restore
+from Scripts import train_validate_test, red_restore, tikhonov_restore, tv_restore, plot_unet_denoising, plot_classic_denoising
 from Data.simulate_astronomy_dataset import gaussian_kernel, download_and_process_sdss  
 
 # === CONFIGURATION ===
@@ -61,30 +60,18 @@ if __name__ == "__main__":
         x_clean=clean_img.to(DEVICE)  # ✅ pass clean reference
     )
 
-    # Move restored image to CPU and detach from computation graph
-    clean_np = clean_img.squeeze().cpu().numpy()
-    restored_np = restored_image.squeeze().cpu().numpy()
-    noisy_np = noisy_img.squeeze().cpu().numpy()
+    plot_unet_denoising(
+        noisy_img, clean_img, restored_image,
+        save_path="output/rid_results/unet_denoising_comparison.png"
+    )
 
-    # Plot side-by-side
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 3, 1)
-    plt.imshow(noisy_np, cmap='gray')
-    plt.title("Noisy Image")
-    plt.axis("off")
-
-    plt.subplot(1, 3, 2)
-    plt.imshow(clean_np, cmap='gray')
-    plt.title("Ground Truth Clean Image")
-    plt.axis("off")
-
-    plt.subplot(1, 3, 3)
-    plt.imshow(restored_np, cmap='gray')
-    plt.title("RED Restored Image")
-    plt.axis("off")
-
-    plt.tight_layout()
-    plt.savefig("output/red_comparison.png")
-    plt.show()
+    # === Compare Classic Denoising Methods ===
     if VERBOSE:
-        print("✅ RED restoration completed and saved to output/red_comparison.png")
+        print("Comparing classic denoising methods...")
+    restored_tikhonov = tikhonov_restore(noisy_img, kernel=psf_tensor, ground_truth=clean_img)
+    restored_tv = tv_restore(noisy_img, kernel=psf_tensor, ground_truth=clean_img)
+    
+    plot_classic_denoising(
+        noisy_img, clean_img, restored_tikhonov, restored_tv,
+        save_path="output/rid_results/classic_denoising_comparison.png"
+    )
