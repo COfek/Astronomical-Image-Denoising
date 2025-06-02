@@ -61,7 +61,7 @@ def plot_classic_denoising(
 
 
 
-def plot_unet_denoising(
+def plot_denoising(
     noisy_img: torch.Tensor,
     clean_img: torch.Tensor,
     restored_img: torch.Tensor,
@@ -110,3 +110,4 @@ def plot_unet_denoising(
 
     if verbose:
         print(f"✅ Plot saved to {save_path}")
+
