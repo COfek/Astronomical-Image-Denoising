@@ -144,3 +144,4 @@ venv.bak/
 #random
 test.py
 psf.npy
+*.zip
