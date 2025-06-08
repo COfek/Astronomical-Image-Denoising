@@ -9,7 +9,7 @@ from torchvision import transforms
 
 # === Custom Dataset & Models ===
 from Data.dataloader import AstroDenoisingDataset
-from Data.simulate_astronomy_dataset import download_and_process_sdss
+from Data.simulate_astronomy_dataset import download_and_process_sdss, download_and_process_div2k
 from Models.unet import UNet
 from Models.ViT import ViTDenoiser
 from Models.DnCNN import DnCNN
@@ -28,8 +28,9 @@ from Scripts.TV_restore import tv_restore
 # === CONFIGURATION ===
 VERBOSE = True
 DO_TRAIN = True
-MODEL_TO_TRAIN = "ViT"  # Options: "UNet", "DnCNN", "ViT"
+MODEL_TO_TRAIN = "UNet"  # Options: "UNet", "DnCNN", "ViT"
 DOWNLOAD_AND_PROCESS_SDSS = False
+DOWNLOAD_AND_PROCESS_DIV2K = True  # Not implemented in this script
 BATCH_SIZE = 8
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = Path(f"output/{MODEL_TO_TRAIN}/best_{MODEL_TO_TRAIN}.pth")
@@ -39,6 +40,8 @@ def main():
     # Optional: download and process data
     if DOWNLOAD_AND_PROCESS_SDSS:
         download_and_process_sdss()
+    if DOWNLOAD_AND_PROCESS_DIV2K:
+        download_and_process_div2k()
 
     # === Load Dataset ===
     dataset = AstroDenoisingDataset("Data/clean", "Data/noisy", transform=transforms.ToTensor())
@@ -67,7 +70,7 @@ def main():
         if MODEL_TO_TRAIN == "UNet":
             train_unet(model, train_loader, val_loader, test_loader)
         elif MODEL_TO_TRAIN == "DnCNN":
-            train_validate_test_dncnn(model, train_loader, val_loader, test_loader, epochs=20)
+            train_validate_test_dncnn(model, train_loader, val_loader, test_loader, epochs=10)
         elif MODEL_TO_TRAIN == "ViT":
             train_validate_test_vit(model, train_loader, val_loader, test_loader, epochs=20)
     else:
