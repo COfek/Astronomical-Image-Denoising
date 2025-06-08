@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.zip
 
 # C extensions
 *.so
@@ -14,6 +15,8 @@ dist/
 downloads/
 Data/noisy
 Data/clean
+Data/downsampled
+Data/div2k_raw
 output/
 eggs/
 .eggs/
@@ -144,4 +147,3 @@ venv.bak/
 #random
 test.py
 psf.npy
-*.zip

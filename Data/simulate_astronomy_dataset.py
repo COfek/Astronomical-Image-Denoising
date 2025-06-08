@@ -1,21 +1,24 @@
-import os
-import requests
-from io import BytesIO
-import numpy as np
-import cv2
-from pathlib import Path
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import List, Tuple
+import os
+
+import cv2
+import numpy as np
+import requests
+from kaggle.api.kaggle_api_extended import KaggleApi
 from scipy.signal import convolve2d
 from tqdm import tqdm
-from typing import Tuple, List
+from threading import Lock
 
 # === Configuration ===
-NUM_IMAGES: int = 1000
-OUTPUT_DIR: str = "Data"
-IMAGE_SIZE: Tuple[int, int] = (256, 256)
-GAUSSIAN_SIGMA: float = 0.05
-PSF_SIGMA: float = 2
-PSF_SIZE: int = 11
+NUM_IMAGES: int = 1000 # Number of images to simulate
+OUTPUT_DIR: str = "Data" # Output directory for clean and noisy images
+IMAGE_SIZE: Tuple[int, int] = (256, 256)  # Size to resize images to
+GAUSSIAN_SIGMA: float = 0.05 # Standard deviation for Gaussian noise
+PSF_SIGMA: float = 2 # Standard deviation for Gaussian PSF
+PSF_SIZE: int = 11 # Size of the Gaussian PSF (must be odd)
 VERBOSE: bool = False  # Flag to control print statements
 
 # === Output Directories ===
@@ -149,4 +152,61 @@ def download_and_process_sdss() -> None:
     if VERBOSE:
         print(f"\n🎉 Done! {len(futures)} images saved to `{OUTPUT_DIR}`")
 
+#  === Downsample DIV2K Dataset === 
+
+def downsample_image(img: np.ndarray, factor: int) -> np.ndarray:
+    """Downsamples an image by a given factor using area interpolation."""
+    h, w = img.shape[:2]
+    return cv2.resize(img, (w // factor, h // factor), interpolation=cv2.INTER_AREA)
+
+def process_and_save(img_path: Path, downsampled_dir: Path, factor: int, pbar: tqdm, lock: Lock) -> None:
+    """Reads, downsamples, and saves the high-res and low-res versions of an image."""
+    img = cv2.imread(str(img_path))
+    if img is not None:
+        down = downsample_image(img, factor)
+        cv2.imwrite(str(downsampled_dir / img_path.name), down)
+    with lock:
+        pbar.update(1)
+
+def download_and_process_div2k(factor: int = 4) -> None:
+    """Download the DIV2K dataset from Kaggle, extract it, and downsample the images."""
+    
+    # === Setup directories ===
+    data_dir = Path("Data")
+    downsampled_dir = data_dir / "downsampled"
+    extract_dir = data_dir/ "div2k_raw"
+    zip_path = extract_dir / "div2k-dataset.zip"
+    downsampled_dir.mkdir(parents=True, exist_ok=True)
+    extract_dir.mkdir(parents=True, exist_ok=True)
+
+    # === Download with Kaggle API ===
+    if not zip_path.exists():
+        print("🔽 Downloading DIV2K dataset from Kaggle...")
+        api = KaggleApi()
+        api.authenticate()
+        api.dataset_download_files("joe1995/div2k-dataset", path=extract_dir, unzip=False)
+    else:
+        print("📁 Found existing ZIP file. Skipping download.")
+
+    # === Unzip dataset ===
+    print("📦 Extracting...")
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_dir)
+
+    # === Process images in parallel with progress bar ===
+    image_folder = extract_dir / "DIV2K_train_HR" / "DIV2K_train_HR"
+    image_files = list(image_folder.glob("*.png"))
+
+    if not image_files:
+        raise RuntimeError(f"No PNG files found in {image_folder}")
+
+    print(f"📸 Processing {len(image_files)} images with {os.cpu_count()} threads...")
+
+    lock = Lock()
+    with tqdm(total=len(image_files), desc="🔧 Processing") as pbar:
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            for img_path in image_files:
+                executor.submit(process_and_save, img_path, downsampled_dir, factor, pbar, lock)
+
+    print("✅ Done. Saved to `Data/highres` and `Data/downsampled`.")
 
