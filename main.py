@@ -29,8 +29,7 @@ from Scripts.TV_restore import tv_restore
 VERBOSE = True
 DO_TRAIN = True
 MODEL_TO_TRAIN = "UNet"  # Options: "UNet", "DnCNN", "ViT"
-DOWNLOAD_AND_PROCESS_SDSS = False
-DOWNLOAD_AND_PROCESS_DIV2K = True  # Not implemented in this script
+DOWNLOAD_AND_PROCESS_SDSS = True
 BATCH_SIZE = 8
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = Path(f"output/{MODEL_TO_TRAIN}/best_{MODEL_TO_TRAIN}.pth")
@@ -40,8 +39,6 @@ def main():
     # Optional: download and process data
     if DOWNLOAD_AND_PROCESS_SDSS:
         download_and_process_sdss()
-    if DOWNLOAD_AND_PROCESS_DIV2K:
-        download_and_process_div2k()
 
     # === Load Dataset ===
     dataset = AstroDenoisingDataset("Data/clean", "Data/noisy", transform=transforms.ToTensor())
@@ -62,6 +59,8 @@ def main():
         model = DnCNN().to(DEVICE)
     elif MODEL_TO_TRAIN == "ViT":
         model = ViTDenoiser().to(DEVICE)
+    elif MODEL_TO_TRAIN == "HybridViT":
+        model = HybridViTDenoiser().to(DEVICE)
     else:
         raise ValueError(f"Unknown model type: {MODEL_TO_TRAIN}")
 

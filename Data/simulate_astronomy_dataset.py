@@ -13,7 +13,7 @@ from tqdm import tqdm
 from threading import Lock
 
 # === Configuration ===
-NUM_IMAGES: int = 1000 # Number of images to simulate
+NUM_IMAGES: int = 100000 # Number of images to simulate
 OUTPUT_DIR: str = "Data" # Output directory for clean and noisy images
 IMAGE_SIZE: Tuple[int, int] = (256, 256)  # Size to resize images to
 GAUSSIAN_SIGMA: float = 0.05 # Standard deviation for Gaussian noise

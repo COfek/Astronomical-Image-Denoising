@@ -146,17 +146,6 @@ def train_validate_test_vit(model: nn.Module, train_loader, val_loader, test_loa
             if j == 0:
                 axes[i, j].set_ylabel(["Noisy", "Denoised", "Clean"][i], fontsize=12)
 
-
-    # fig, axes = plt.subplots(3, noisy.shape[0], figsize=(noisy.shape[0] * 2, 6))
-    # titles = ["Noisy", "Denoised", "Clean"]
-    # for i in range(3):
-    #     for j in range(noisy.shape[0]):
-    #         img = [noisy, output, clean][i][j][0]
-    #         axes[i, j].imshow(img, cmap='gray')
-    #         axes[i, j].axis('off')
-    #         if j == 0:
-    #             axes[i, j].set_ylabel(titles[i], fontsize=12)
-
     plt.tight_layout()
     plt.savefig(output_dir / "sample_results.png")
     plt.close()
