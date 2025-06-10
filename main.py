@@ -19,7 +19,7 @@ from Models.tikhonov import LinearTikhonovDenoiser
 from Models.TV import TVDenoiser
 
 # === Training Functions ===
-from Scripts.train_unet import train_validate_test
+from Scripts.train_val_test import train_validate_test
 
 # === Plotting & Classic Denoisers ===
 from Scripts.plots import side_by_side_plot
