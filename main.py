@@ -2,6 +2,7 @@
 from pathlib import Path
 import numpy as np
 import torch
+import json
 
 # === PyTorch & TorchVision ===
 from torch.utils.data import DataLoader, random_split
@@ -9,34 +10,33 @@ from torchvision import transforms
 
 # === Custom Dataset & Models ===
 from Data.dataloader import AstroDenoisingDataset
-from Data.simulate_astronomy_dataset import download_and_process_sdss, download_and_process_div2k
+from Data.simulate_astronomy_dataset import download_and_process_sdss
 from Models.unet import UNet
 from Models.ViT import ViTDenoiser
 from Models.DnCNN import DnCNN
+from Models.BM3D import BM3DDenoiser
+from Models.tikhonov import LinearTikhonovDenoiser
+from Models.TV import TVDenoiser
 
 # === Training Functions ===
-from Scripts.train_unet import train_validate_test as train_unet
-from Scripts.train_ViT import train_validate_test_vit
-from Scripts.train_DnCNN import train_validate_test_dncnn
+from Scripts.train_unet import train_validate_test
 
 # === Plotting & Classic Denoisers ===
-from Scripts.plots import plot_classic_denoising, plot_denoising
-from Scripts.red_inference import red_restore
-from Scripts.tikhonov_restore import tikhonov_restore
-from Scripts.TV_restore import tv_restore
+from Scripts.plots import side_by_side_plot
+from Scripts.red_inference import red_sd
+from Scripts.utils import compute_psnr, compute_ssim
 
 # === CONFIGURATION ===
 VERBOSE = True
-DO_TRAIN = True
+DO_TRAIN = False
 MODEL_TO_TRAIN = "UNet"  # Options: "UNet", "DnCNN", "ViT"
-DOWNLOAD_AND_PROCESS_SDSS = True
+DOWNLOAD_AND_PROCESS_SDSS = False
 BATCH_SIZE = 8
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = Path(f"output/{MODEL_TO_TRAIN}/best_{MODEL_TO_TRAIN}.pth")
 
 # === MAIN FUNCTION ===
 def main():
-    # Optional: download and process data
     if DOWNLOAD_AND_PROCESS_SDSS:
         download_and_process_sdss()
 
@@ -49,8 +49,7 @@ def main():
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)  # RED expects single image
-
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     # === Select Model ===
     if MODEL_TO_TRAIN == "UNet":
@@ -59,19 +58,13 @@ def main():
         model = DnCNN().to(DEVICE)
     elif MODEL_TO_TRAIN == "ViT":
         model = ViTDenoiser().to(DEVICE)
-    elif MODEL_TO_TRAIN == "HybridViT":
-        model = HybridViTDenoiser().to(DEVICE)
     else:
         raise ValueError(f"Unknown model type: {MODEL_TO_TRAIN}")
 
     # === Train or Load Model ===
     if DO_TRAIN:
-        if MODEL_TO_TRAIN == "UNet":
-            train_unet(model, train_loader, val_loader, test_loader)
-        elif MODEL_TO_TRAIN == "DnCNN":
-            train_validate_test_dncnn(model, train_loader, val_loader, test_loader, epochs=10)
-        elif MODEL_TO_TRAIN == "ViT":
-            train_validate_test_vit(model, train_loader, val_loader, test_loader, epochs=20)
+        train_validate_test(model, train_loader, val_loader, test_loader, MODEL_TO_TRAIN,
+                            epochs=10, batch_size=BATCH_SIZE, verbose=VERBOSE)
     else:
         if not MODEL_PATH.exists():
             raise FileNotFoundError(f"Model checkpoint not found at {MODEL_PATH}")
@@ -82,40 +75,53 @@ def main():
     # === Load One Test Image & PSF Kernel ===
     noisy_img, clean_img = next(iter(test_loader))
     psf_np = np.load("Data/psf.npy")
-    psf_tensor = torch.tensor(psf_np, dtype=torch.float32).unsqueeze(0).unsqueeze(0)  # shape [1, 1, H, W]
+    psf_tensor = torch.tensor(psf_np, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
 
-    # === RED Inference ===
-    if VERBOSE:
-        print("Performing RED inference on one test image...")
-    restored_image = red_restore(
-        y=noisy_img.to(DEVICE),
-        denoiser=model,
-        kernel=psf_tensor.to(DEVICE),
-        lambda_=0.1,
-        alpha=0.1,
-        max_iter=1000,
-        verbose=True,
-        device=DEVICE,
-        x_clean=clean_img.to(DEVICE)
-    )
+    # === Evaluate direct model output (no RED) ===
+    with torch.no_grad():
+        direct_output = model(noisy_img.to(DEVICE))
+        psnr_direct = compute_psnr(direct_output, clean_img.to(DEVICE))
+        ssim_direct = compute_ssim(direct_output, clean_img.to(DEVICE))
+        print(f"🧠 Direct {MODEL_TO_TRAIN} output — PSNR: {psnr_direct:.2f}, SSIM: {ssim_direct:.4f}")
 
-    # === Plot RED Result ===
-    plot_denoising(
-        noisy_img, clean_img, restored_image,
-        save_path=f"output/rid_results/{MODEL_TO_TRAIN}_denoising_comparison.png"
-    )
+    # === Setup Denoisers (including learned model) ===
+    denoisers = {
+        f"RED-{MODEL_TO_TRAIN}": model,
+        "BM3D": BM3DDenoiser(sigma=25),
+        "TV": TVDenoiser(weight=0.1, n_iter=5),
+        "Tikhonov": LinearTikhonovDenoiser(beta=0.05)
+    }
 
-    # === Compare Classic Methods ===
-    if VERBOSE:
-        print("Comparing classic denoising methods...")
-    restored_tikhonov = tikhonov_restore(noisy_img, kernel=psf_tensor, ground_truth=clean_img)
-    restored_tv = tv_restore(noisy_img, kernel=psf_tensor, ground_truth=clean_img)
+    results = {f"Direct-{MODEL_TO_TRAIN}": direct_output}
+    metrics = {f"Direct-{MODEL_TO_TRAIN}": (psnr_direct, ssim_direct)}
 
-    plot_classic_denoising(
-        noisy_img, clean_img, restored_tikhonov, restored_tv,
-        save_path="output/rid_results/classic_denoising_comparison.png"
-    )
+    # === Run RED with all denoisers ===
+    print("\n🔬 Running RED with all denoisers (including learned model)...")
+    for name, denoiser in denoisers.items():
+        print(f"\n🔧 Running RED with {name} denoiser")
+        x_restored = red_sd(
+            y=noisy_img.to(DEVICE),
+            denoiser=denoiser,
+            kernel=psf_tensor.to(DEVICE),
+            lambda_=0.05,
+            alpha=0.1,
+            max_iter=30 if name != f"RED-{MODEL_TO_TRAIN}" else 1000,
+            x_clean=clean_img.to(DEVICE),
+            verbose=True,
+            device=DEVICE
+        )
+        results[name] = x_restored
+        psnr = compute_psnr(x_restored, clean_img.to(DEVICE))
+        ssim = compute_ssim(x_restored, clean_img.to(DEVICE))
+        metrics[name] = (psnr, ssim)
+        print(f"✅ {name} — PSNR: {psnr:.2f} dB, SSIM: {ssim:.4f}")
 
+    # === Visualize Comparison ===
+    side_by_side_plot(noisy_img, clean_img, results, metrics,
+                    save_path=f"output/red_results/{MODEL_TO_TRAIN}_denoising_comparison.png")
+
+    with open(f"output/red_results/{MODEL_TO_TRAIN}_metrics.json", "w") as f:
+        json.dump({k: [float(v[0]), float(v[1])] for k, v in metrics.items()}, f, indent=2)
 
 # === ENTRY POINT ===
 if __name__ == "__main__":

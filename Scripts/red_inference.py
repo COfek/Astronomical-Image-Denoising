@@ -20,7 +20,7 @@ def apply_blur_T(x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     return F.conv2d(x, torch.flip(kernel, dims=[2, 3]), padding="same")
 
 
-def red_restore(
+def red_sd(
     y: torch.Tensor,
     denoiser: torch.nn.Module,
     kernel: torch.Tensor,
