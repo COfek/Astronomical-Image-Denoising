@@ -12,6 +12,7 @@ from torchvision import transforms
 from Data.dataloader import AstroDenoisingDataset
 from Data.simulate_astronomy_dataset import download_and_process_sdss
 from Models.unet import UNet
+from Models.ViT import ViTDenoiser
 from Models.BM3D import BM3DDenoiser  # optional fallback baseline
 
 # === Plotting & Utilities ===
@@ -46,6 +47,9 @@ def main():
     # === Load Denoising Model ===
     if MODEL_TO_USE == "UNet":
         model = UNet().to(DEVICE)
+    elif MODEL_TO_USE == "ViT":
+        model = ViTDenoiser().to(DEVICE)
+
     else:
         raise ValueError(f"Unsupported model: {MODEL_TO_USE}")
 

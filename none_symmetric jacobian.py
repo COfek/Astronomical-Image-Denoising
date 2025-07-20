@@ -28,7 +28,6 @@ from Scripts.utils import compute_psnr, compute_ssim
 
 # === CONFIGURATION ===
 VERBOSE = True
-DO_TRAIN = False
 MODEL_TO_TRAIN = "UNet"  # Options: "UNet", "DnCNN", "ViT"
 DOWNLOAD_AND_PROCESS_SDSS = False
 BATCH_SIZE = 8
@@ -61,16 +60,11 @@ def main():
     else:
         raise ValueError(f"Unknown model type: {MODEL_TO_TRAIN}")
 
-    # === Train or Load Model ===
-    if DO_TRAIN:
-        train_validate_test(model, train_loader, val_loader, test_loader, MODEL_TO_TRAIN,
-                            epochs=10, batch_size=BATCH_SIZE, verbose=VERBOSE)
-    else:
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Model checkpoint not found at {MODEL_PATH}")
-        model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-        if VERBOSE:
-            print(f"✅ Loaded pre-trained {MODEL_TO_TRAIN} from {MODEL_PATH}")
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model checkpoint not found at {MODEL_PATH}")
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+    if VERBOSE:
+        print(f"✅ Loaded pre-trained {MODEL_TO_TRAIN} from {MODEL_PATH}")
 
     # === Load One Test Image & PSF Kernel ===
     noisy_img, clean_img = next(iter(test_loader))

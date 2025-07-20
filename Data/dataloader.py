@@ -35,7 +35,8 @@ class AstroDenoisingDataset(Dataset):
         self.transform = transform or transforms.ToTensor()
 
     def __len__(self) -> int:
-        return len(self.clean_paths)
+        #return len(self.clean_paths)
+        return 1000
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         clean_img = Image.open(self.clean_paths[idx]).convert("L")

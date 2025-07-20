@@ -79,18 +79,19 @@ def main():
     results = {}
     metrics = {}
 
-    print("\n🔬 Running ADMM with all denoisers...")
+    print("\n Running ADMM with all denoisers...")
     psf_np = np.load("Data/psf.npy")
+    psf_np /= psf_np.sum()
     psf_tensor = torch.tensor(psf_np, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
     for name, denoiser in denoisers.items():
-        print(f"\n🔧 Running {name}")
+        print(f"\n Running {name}")
         x_restored = admm_reconstruct(
             y=noisy_img.to(DEVICE),
             denoiser=denoiser,
             kernel=psf_tensor.to(DEVICE),
-            lambda_=0.05,
+            lambda_=0.001,
             rho=0.1,
-            max_iter=30,
+            max_iter=100,
             verbose=True,
             device=DEVICE
         )
