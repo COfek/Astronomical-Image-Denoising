@@ -23,7 +23,7 @@ from Scripts.smd import smd_denoise  # <<< NEW import
 # === CONFIGURATION ===
 VERBOSE = True
 DOWNLOAD_AND_PROCESS_SDSS = False
-MODEL_TO_USE = "UNet"
+MODEL_TO_USE = "ViT"  # Options: "UNet", "ViT"
 BATCH_SIZE = 1
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODEL_PATH = Path(f"output/{MODEL_TO_USE}/best_{MODEL_TO_USE}.pth")

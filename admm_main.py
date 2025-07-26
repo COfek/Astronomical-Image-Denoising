@@ -29,7 +29,7 @@ from Scripts.admm import admm_reconstruct
 # === CONFIGURATION ===
 VERBOSE = True
 DO_TRAIN = False
-MODEL_TO_TRAIN = "UNet"  # Options: "UNet", "DnCNN", "ViT"
+MODEL_TO_TRAIN = "ViT"  # Options: "UNet", "DnCNN", "ViT"
 DOWNLOAD_AND_PROCESS_SDSS = False
 BATCH_SIZE = 8
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

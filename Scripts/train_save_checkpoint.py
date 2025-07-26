@@ -65,5 +65,6 @@ def train_save_chkpt():
         raise ValueError(f"Unknown model type: {MODEL_TO_TRAIN}")
 
     train_validate_test(model, train_loader, val_loader, test_loader, MODEL_TO_TRAIN,
-                        epochs=10, batch_size=BATCH_SIZE, verbose=VERBOSE)
+                        epochs=8, batch_size=BATCH_SIZE, verbose=VERBOSE)
     
+train_save_chkpt()
