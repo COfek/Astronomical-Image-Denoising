@@ -49,6 +49,8 @@ We utilize both classical and deep learning-based denoisers (e.g., BM3D, Tikhono
 │   ├── smd.py
 │   ├── utils.py
 │   ├── plots.py
+├── notebooks/
+│   └── inference_and_training.ipynb
 ├── output/
 ├── config.yaml
 ├── main.py
@@ -74,6 +76,16 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+
+### 🔹 Alternatively, use the Jupyter Notebook:
+
+You can run training and inference from the notebook provided in:
+
+```
+/notebooks/inference_and_training.ipynb
+```
+
+This is especially useful for debugging, visualization, and exploratory experiments.
 
 ---
 
@@ -122,10 +134,10 @@ Other models we tried:
 
 ## 📖 References
 
-1. Romano et al. (2017). RED
-2. Zhang et al. (2017). Residual Learning for Denoising
-3. Kadkhodaie & Simoncelli (2021). Implicit Prior via Denoiser
-4. Adler & Öktem (2018). Learned Primal-Dual
+1. Romano et al. (2017). RED  
+2. Zhang et al. (2017). Residual Learning for Denoising  
+3. Kadkhodaie & Simoncelli (2021). Implicit Prior via Denoiser  
+4. Adler & Öktem (2018). Learned Primal-Dual  
 
 ---
 
